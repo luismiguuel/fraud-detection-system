@@ -97,7 +97,7 @@ A solução foi avaliada utilizando a métrica **ROC** **AUC**.
 Utilizamos a biblioteca **SHAP (SHapley Additive exPlanations)** para abrir a "caixa-preta" dos modelos e entender os fatores de decisão. A análise comparativa revelou que o LightGBM e o XGBoost "olham" para os dados de formas distintas, o que justifica a alta performance do Ensemble.
 
 ### **1. LightGBM: Agressividade e Foco Estrutural**
-![SHAP LGBM](reports/shap_summary_LGBM.png)
+<img src="reports/shap_summary_LGBM.png" width="50%" alt="SHAP LGBM">
 
 O LightGBM demonstrou um comportamento mais concentrado e agressivo:
 * **Dominância da Feature V4:** É a variável soberana no modelo, com amplitude de impacto SHAP muito alta (de -2 a +5). Valores altos em `V4` (pontos vermelhos) indicam forte probabilidade de fraude.
@@ -105,7 +105,7 @@ O LightGBM demonstrou um comportamento mais concentrado e agressivo:
 * **Risco:** Apresenta maior sensibilidade a outliers nessas features específicas.
 
 ### **2. XGBoost: Estabilidade e Contexto**
-![SHAP XGBoost](reports/shap_summary_XGBM.png)
+<img src="reports/shap_summary_XGBM.png" width="50%" alt="SHAP XGBoost">
 
 O XGBoost apresentou uma distribuição de importância mais equilibrada e robusta:
 * **Dominância da Feature V14:** Diferente do LGBM, aqui a feature `V14` é o principal discriminador. Valores baixos (pontos azuis) aumentam drasticamente o risco de fraude.
