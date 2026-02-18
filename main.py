@@ -1,7 +1,9 @@
 import pandas as pd
 import numpy as np
+import joblib
 from src.preprocessing import load_data, prepare_data
 from src.training import train_ensemble
+from src.interpretation import explain_model
 
 SEED = 42
 np.random.seed(SEED)
@@ -19,6 +21,13 @@ def main():
     
     # Treinamento e Validação
     final_predictions = train_ensemble(X, y, X_test)
+
+    # Interpretabilidade e geração de gráficos
+    lgbm_model = joblib.load('models/lgbm_model.pkl')
+    xgbm_model = joblib.load('models/xgboost_model.pkl')
+
+    explain_model(lgbm_model, X, model_name="LGBM")
+    explain_model(xgbm_model, X, model_name="XGBM")
     
     # Geração de Submissão
     print("Gerando arquivo de submissão...")
