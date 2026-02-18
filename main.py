@@ -1,99 +1,130 @@
 import pandas as pd
 import numpy as np
 import lightgbm as lgb
+import xgboost as xgb
 from sklearn.model_selection import StratifiedKFold
 from sklearn.metrics import roc_auc_score
-from sklearn.preprocessing import StandardScaler
+from sklearn.preprocessing import RobustScaler
 
 SEED = 42
 np.random.seed(SEED)
 
-print("🚀 Iniciando o processamento...")
+print("Iniciando processamento avançado...")
 
-# Carregar os dados de treino e teste
+# Carregar Dados
 train = pd.read_csv('train.csv')
 test = pd.read_csv('test.csv')
 
-print(f"Dados Carregados. Treino: {train.shape}, Teste: {test.shape}")
+# Análise exploratória 
+train['Hour'] = train['Time'].apply(lambda x: np.ceil(float(x) / 3600) % 24)
+test['Hour'] = test['Time'].apply(lambda x: np.ceil(float(x) / 3600) % 24)
 
-# Pré-processamento
-train['Amount'] = np.log1p(train['Amount'])
-test['Amount'] = np.log1p(test['Amount'])
+# Normalizando a coluna Amount
+rs = RobustScaler()
+train['Amount'] = rs.fit_transform(train['Amount'].values.reshape(-1, 1))
+test['Amount'] = rs.transform(test['Amount'].values.reshape(-1, 1))
 
-# Padronizando a coluna 'Time' para ajudar o modelo a aprender melhor
-sc = StandardScaler()
-train['Time'] = sc.fit_transform(train['Time'].values.reshape(-1, 1))
-test['Time'] = sc.transform(test['Time'].values.reshape(-1, 1))
+# Normalizando o tempo
+train['Time'] = rs.fit_transform(train['Time'].values.reshape(-1, 1))
+test['Time'] = rs.transform(test['Time'].values.reshape(-1, 1))
 
-# Separando as features e o target
-cols_to_drop = ['id', 'Class']
-X = train.drop(cols_to_drop, axis=1)
+# Preparando x e y
+X = train.drop(['id', 'Class'], axis=1)
 y = train['Class']
-
-# Removendo 'id' do teste mas mantendo para a submissão final
 X_test = test.drop(['id'], axis=1)
 
-# Parâmetros otimizados para alta performance e dados desbalanceados
-params = {
+print(f"Features criadas. Colunas atuais: {X.columns.tolist()}")
+
+# Definição dos Modelos:
+
+# MODELO A: LightGBM 
+lgb_params = {
     'objective': 'binary',
     'metric': 'auc',
-    'is_unbalance': True,      
-    'boosting_type': 'gbdt',
-    'random_state': SEED, 
-    'learning_rate': 0.02,      
-    'num_leaves': 64,           
-    'max_depth': -1,
-    'feature_fraction': 0.8,    
+    'is_unbalance': True,
+    'verbosity': -1,
+    'seed': SEED,
+    'learning_rate': 0.01,    
+    'num_leaves': 31,         
+    'feature_fraction': 0.8,
     'bagging_fraction': 0.8,
     'bagging_freq': 5,
-    'n_jobs': -1,               #
-    'verbosity': -1
+    'reg_alpha': 0.1,       
+    'reg_lambda': 0.1
 }
 
+# MODELO B: XGBoost
+# Calculando peso para classes desbalanceadas
+ratio = float(np.sum(y == 0)) / np.sum(y == 1)
+xgb_params = {
+    'objective': 'binary:logistic',
+    'eval_metric': 'auc',
+    'scale_pos_weight': ratio, 
+    'learning_rate': 0.02,
+    'max_depth': 4,            
+    'subsample': 0.8,
+    'colsample_bytree': 0.8,
+    'seed': SEED,
+    'n_jobs': -1,
+    'enable_categorical': False
+}
 
-# Isso treina o modelo 5 vezes em partes diferentes dos dados para garantir robustez
-
+# Estratégia de treinamento
 folds = StratifiedKFold(n_splits=5, shuffle=True, random_state=SEED)
-test_preds = np.zeros(len(X_test))
-oof_preds = np.zeros(len(X))
 
-print("\nIniciando Treinamento Cross-Validation...")
+# Arrays para guardar as previsões
+oof_lgb = np.zeros(len(X))
+test_pred_lgb = np.zeros(len(X_test))
+
+oof_xgb = np.zeros(len(X))
+test_pred_xgb = np.zeros(len(X_test))
+
+print("\nIniciando Treinamento Híbrido (Isso pode demorar um pouco)...")
 
 for fold, (train_idx, val_idx) in enumerate(folds.split(X, y)):
     X_train, y_train = X.iloc[train_idx], y.iloc[train_idx]
     X_val, y_val = X.iloc[val_idx], y.iloc[val_idx]
     
-    # Criando o modelo
-    model = lgb.LGBMClassifier(**params, n_estimators=2000)
+    # LightGBM
+    lgb_model = lgb.LGBMClassifier(**lgb_params, n_estimators=5000)
+    lgb_model.fit(X_train, y_train, eval_set=[(X_val, y_val)], 
+                  callbacks=[lgb.early_stopping(100), lgb.log_evaluation(0)])
     
-    # Treinando com early stopping (para de treinar se não melhorar após 100 rodadas)
-    model.fit(
-        X_train, y_train,
-        eval_set=[(X_val, y_val)],
-        eval_metric='auc',
-        callbacks=[lgb.early_stopping(stopping_rounds=100), lgb.log_evaluation(period=0)]
-    )
+    oof_lgb[val_idx] = lgb_model.predict_proba(X_val)[:, 1]
+    test_pred_lgb += lgb_model.predict_proba(X_test)[:, 1] / folds.n_splits
     
-    # Previsão na parte de validação
-    val_pred = model.predict_proba(X_val)[:, 1]
-    oof_preds[val_idx] = val_pred
+    # XGBoost
+    xgb_model = xgb.XGBClassifier(**xgb_params, n_estimators=5000, early_stopping_rounds=100)
+    xgb_model.fit(X_train, y_train, eval_set=[(X_val, y_val)], verbose=False)
     
-    # Pontuação
-    score = roc_auc_score(y_val, val_pred)
-    print(f"   -> Fold {fold+1} AUC: {score:.5f}")
+    oof_xgb[val_idx] = xgb_model.predict_proba(X_val)[:, 1]
+    test_pred_xgb += xgb_model.predict_proba(X_test)[:, 1] / folds.n_splits
     
-    # Previsão no arquivo de teste final
-    test_preds += model.predict_proba(X_test)[:, 1] / folds.n_splits
+    # Scores individuais
+    score_lgb = roc_auc_score(y_val, oof_lgb[val_idx])
+    score_xgb = roc_auc_score(y_val, oof_xgb[val_idx])
+    
+    # Score combinado
+    ensemble_pred = (oof_lgb[val_idx] * 0.5) + (oof_xgb[val_idx] * 0.5)
+    score_ens = roc_auc_score(y_val, ensemble_pred)
+    
+    print(f"Fold {fold+1} >> LGB: {score_lgb:.5f} | XGB: {score_xgb:.5f} | COMBO: {score_ens:.5f}")
 
-# Resultado
-final_auc = roc_auc_score(y, oof_preds)
-print(f"\nAUC Média Geral (Validação Interna): {final_auc:.5f}")
-print("-" * 30)
+# Avaliação final
+auc_lgb = roc_auc_score(y, oof_lgb)
+auc_xgb = roc_auc_score(y, oof_xgb)
+auc_ensemble = roc_auc_score(y, (oof_lgb * 0.5 + oof_xgb * 0.5))
 
-# Criação do arquivo de submissão
+print("-" * 40)
+print(f"AUC Final LightGBM: {auc_lgb:.5f}")
+print(f"AUC Final XGBoost:  {auc_xgb:.5f}")
+print(f"AUC Final ENSEMBLE: {auc_ensemble:.5f}")
+
+final_preds = (test_pred_lgb * 0.5) + (test_pred_xgb * 0.5)
+
 submission = pd.DataFrame({
     'id': test['id'],
-    'Class': test_preds
+    'Class': final_preds
 })
 
-submission.to_csv('submission.csv', index=False)
+submission.to_csv('submission_ensemble.csv', index=False)
