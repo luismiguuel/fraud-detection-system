@@ -34,11 +34,11 @@ fraud-detection/
 ## 🚀 Guia de Instalação e Execução
 Siga os passos abaixo para reproduzir os resultados em seu ambiente local.
 
-**1. Pré-requisitos**
+### **1. Pré-requisitos**
 
 Certifique-se de ter o Python 3.8+ instalado. Recomenda-se o uso de um ambiente virtual (venv).
 
-**2. Instalação das Dependências**
+### **2. Instalação das Dependências**
 
 Clone este repositório e instale as bibliotecas necessárias:
 
@@ -48,7 +48,7 @@ pip install -r requirements.txt
 
 *Nota: As versões das bibliotecas foram fixadas para garantir a reprodutibilidade exata dos resultados.*
 
-**3. Configuração dos Dados**
+### **3. Configuração dos Dados**
 
 Devido o tamanho, os dados não estão no repositório.
 
@@ -58,14 +58,14 @@ Crie uma pasta chamada `data` na raiz do projeto.
 
 Mova os arquivos `.csv` para dentro da pasta `data`.
 
-**4. Executando o Pipeline**
+### **4. Executando o Pipeline**
 
 Para rodar o processo completo, execute o arquivo principal:
 
 ```bash
 python main.py
 ```
-**O que o script fará:**
+### **O que o script fará:**
 
 Carregará os dados e aplicará normalização (RobustScaler) e engenharia temporal.
 
@@ -84,7 +84,7 @@ A solução foi avaliada utilizando a métrica **ROC** **AUC**.
 | Validação local | ~0.9653
 | Kaggle | 0.9846
 
-**Destaques da Metodologia:**
+### **Destaques da Metodologia:**
 
 **Seed 42:** Fixada em todas as bibliotecas para garantir determinismo.
 
