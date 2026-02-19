@@ -94,7 +94,7 @@ A solução foi avaliada utilizando a métrica **ROC** **AUC**.
 
 ## 🧠 Interpretabilidade e Análise Crítica (SHAP)
 
-Utilizamos a biblioteca **SHAP (SHapley Additive exPlanations)** para abrir a "caixa-preta" dos modelos e entender os fatores de decisão. A análise comparativa revelou que o LightGBM e o XGBoost "olham" para os dados de formas distintas, o que justifica a alta performance do Ensemble.
+Foi utilizado a biblioteca **SHAP (SHapley Additive exPlanations)** para abrir a "caixa-preta" dos modelos e entender os fatores de decisão. A análise comparativa revelou que o LightGBM e o XGBoost "olham" para os dados de formas distintas, o que justifica a alta performance do Ensemble.
 
 ### **1. LightGBM: Agressividade e Foco Estrutural**
 <img src="reports/shap_summary_LGBM.png" width="50%" alt="SHAP LGBM">
