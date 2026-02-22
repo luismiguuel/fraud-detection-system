@@ -38,4 +38,5 @@ def main():
     
     submission.to_csv('submission.csv', index=False)
 
-main()
+if __name__ == "__main__":
+    main()

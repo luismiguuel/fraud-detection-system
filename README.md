@@ -19,13 +19,22 @@ fraud-detection/
 │   └── test.csv            # Dataset de teste (sem target)
 │
 ├── models/                 # Artefatos serializados dos modelos treinados
-│   ├── lgbm_model.pkl      # Modelo LightGBM final
-│   └── xgboost_model.pkl   # Modelo XGBoost final
+│   ├── lgbm_tuned.pkl      # Modelo LightGBM final tunado
+│   └── xgboost_tuned.pkl   # Modelo XGBoost final tunado
 │
-├── src/                    # Código fonte modularizado
-│   ├── preprocessing.py    # Pipelines de limpeza e engenharia de features
-│   └── training.py         # Lógica de treinamento, validação cruzada e ensemble
+├── notebooks/
+|   ├── eda_analise.ipynb
 │
+├── experiments/            # Scripts de pesquisa e otimização de hiperparâmetros
+│   ├── tune_lgbm.py        # Script de tunagem do LightGBM
+│   └── tune_xgb.py         # Script de tunagem do XGBoost
+│
+├── src/                    # Código fonte modularizado (Produção)
+│   ├── preprocessing.py    # Pipelines de limpeza, scalers e engenharia de features
+│   ├── training.py         # Lógica de treinamento, validação temporal e ensemble
+│   └── interpretation.py   # Lógica de geração de gráficos de interpretabilidade (SHAP)
+│
+├── reports/                # Gráficos e análises visuais gerados pelo modelo
 ├── main.py                 # Orquestrador principal da execução
 ├── requirements.txt        # Dependências do projeto com versões travadas
 └── README.md               # Documentação oficial
@@ -69,7 +78,7 @@ python main.py
 
 Carregará os dados e aplicará normalização (RobustScaler) e engenharia temporal.
 
-Treinará os modelos LightGBM e XGBoost com Validação Cruzada Estratificada (5 Folds).
+Treinará os modelos LightGBM e XGBoost com Validação Cruzada Temporal (TimeSeriesSplit com 5 Folds).
 
 Salvará os modelos treinados na pasta `models`.
 
@@ -81,16 +90,18 @@ A solução foi avaliada utilizando a métrica **ROC** **AUC**.
 
 | Ambiente | Score (AUC) |
 | --- | --- |
-| Validação local | ~0.9653
-| Kaggle | 0.9846
+| Validação local | ~0.9806
+| Kaggle | 0.9891
 
 ### **Destaques da Metodologia:**
 
-**Seed 42:** Fixada em todas as bibliotecas para garantir determinismo.
+**Prevenção de Data Leakage:** Implementação rigorosa de scalers garantindo o uso exclusivo de `.transform()` nos dados de teste, blindando o modelo contra o vazamento de estatísticas do futuro.
 
-**Feature Engineering:** Transformação da variável Time em "Hora do Dia" para capturar padrões temporais de fraude.
+**Seed 42:** Fixada em todas as bibliotecas para garantir determinismo e reprodutibilidade.
 
-**Tratamento de Desbalanceamento:** Uso de `is_unbalance=True` (LGBM) e `scale_pos_weight` (XGBoost) em vez de resampling artificial, preservando a distribuição original dos dados.
+**Feature Engineering:** Transformação da variável `Time` em "Hora do Dia" para capturar padrões temporais comportamentais de fraude.
+
+**Tratamento de Desbalanceamento:** Uso dos parâmetros nativos de custo das árvores (`is_unbalance=True` no LGBM e `scale_pos_weight` no XGBoost) em vez de resampling artificial, preservando a distribuição original e orgânica dos dados.
 
 ## 🧠 Interpretabilidade e Análise Crítica (SHAP)
 
@@ -116,7 +127,7 @@ O XGBoost apresentou uma distribuição de importância mais equilibrada e robus
 Embora o modelo minimize Falsos Negativos (deixando passar poucas fraudes), a agressividade do LightGBM em features como `V4` pode gerar alguns **Falsos Positivos** (bloqueio de clientes legítimos). Em um cenário real de produção, recomenda-se uma camada humana de revisão para scores limítrofes (entre 0.7 e 0.9) para evitar atrito com o cliente.
 
 ### **4. Conclusão: O Poder da Complementaridade**
-A análise SHAP explica o porquê a solução atingiu **AUC 0.9846**:
+A análise SHAP explica o porquê a solução atingiu **AUC 0.9891**:
 
 > **Hipótese Confirmada:** Existe uma **complementaridade estrutural**. Onde o LightGBM é agressivo e focado na feature `V4`, o XGBoost traz equilíbrio focando em `V14` e adicionando o contexto de `Amount` e `Time`. O Ensemble combina o melhor desses dois mundos, cobrindo os "pontos cegos" individuais de cada algoritmo.
 
